@@ -1,0 +1,24 @@
+name: checks
+
+# Calls the shared Heliodoron checks. The logic lives in heliodoron/.github;
+# Dependabot moves the pinned SHA when a new version is tagged.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    uses: heliodoron/.github/.github/workflows/shared-checks.yml@000ddbfdd0dfa489f99c05eccfeec37ed50dd759 # v1.0.0
+    with:
+      typography-skip: ""
+      large-file-allow: ""

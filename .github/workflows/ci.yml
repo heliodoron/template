@@ -1,0 +1,53 @@
+name: ci
+
+# The repository's own CI. Add jobs for this system (lint, tests, eval replay,
+# validate) and list every one of them in the `needs` of the `ci` gate job.
+# The ruleset on main requires the single status `ci`, so the gate must stay.
+# Rules: free Ubuntu runner, no secrets, no paid services, actions pinned by SHA.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  standard-files:
+    name: standard files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: The standard files exist
+        run: |
+          set -euo pipefail
+          missing=0
+          for f in README.md LICENSE NOTICE .gitignore .githooks/commit-msg .githooks/pre-push .github/workflows/checks.yml .github/dependabot.yml; do
+            [[ -f "$f" ]] || { echo "Missing standard file: $f" >&2; missing=1; }
+          done
+          [[ "$missing" -eq 0 ]] || exit 1
+
+  ci:
+    name: ci
+    # always() so that a failed or skipped job fails the gate instead of
+    # skipping it: a skipped required status counts as passing.
+    if: always()
+    needs: [standard-files]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every required job passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          set -euo pipefail
+          read -r -a results <<< "$RESULTS"
+          for r in "${results[@]}"; do
+            [[ "$r" == "success" ]] || { echo "A required job ended with: $r" >&2; exit 1; }
+          done
